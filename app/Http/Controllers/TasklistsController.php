@@ -4,9 +4,9 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Http\Requests;
-use App\Task;
+use App\tasklist;
 
-class TasksController extends Controller
+class TasklistsController extends Controller
 {
     /**
      * Display a listing of the resource.
@@ -15,11 +15,22 @@ class TasksController extends Controller
      */
     public function index()
     {
-        $tasks=Task::all();
-    return view('tasks.index', ['tasks'=> $tasks,
-        ]);
-    
+       $data = [];
+        if (\Auth::check()) {
+            $user = \Auth::user();
+            $tasklists = $user->tasklists()->orderBy('created_at', 'desc')->paginate(10);
+
+            $data = [
+                'user' => $user,
+                'tasklists' => $tasklists,
+            ];
+            $data += $this->counts($user);
+            return view('users.show', $data);
+        }else {
+            return view('welcome');
+        }
     }
+    
 
     /**
      * Show the form for creating a new resource.
@@ -28,10 +39,10 @@ class TasksController extends Controller
      */
     public function create()
     {
-        $task = new Task;
+        $tasklist = new tasklist;
 
-        return view('tasks.create', [
-            'task' => $task,
+        return view('tasklists.create', [
+            'tasklist' => $tasklist,
         ]);
     }
 
@@ -44,13 +55,14 @@ class TasksController extends Controller
     public function store(Request $request)
     {
         $this->validate($request, [
+            'content' => 'required|max:191',
             'status' => 'required|max:10',
-            'content' => 'required|max:191'
         ]);
-        $task = new Task;
-        $task->status = $request->status;
-        $task->content = $request->content;
-        $task->save();
+
+        $request->user()->tasklists()->create([
+            'content' => $request->content,
+            'status' => $request->status,
+        ]);
 
         return redirect('/');
     }
@@ -63,9 +75,9 @@ class TasksController extends Controller
      */
     public function show($id)
     {
-        $task=Task::find($id);
-         return view('tasks.show', [
-        'task' => $task,
+        $tasklist=tasklist::find($id);
+         return view('tasklists.show', [
+        'tasklist' => $tasklist,
         ]);
     }
 
@@ -77,10 +89,10 @@ class TasksController extends Controller
      */
     public function edit($id)
     {
-        $task = Task::find($id);
+        $tasklist = tasklist::find($id);
 
-        return view('tasks.edit', [
-            'task' => $task,
+        return view('tasklists.edit', [
+            'tasklist' => $tasklist,
         ]);
     }
 
@@ -98,10 +110,10 @@ class TasksController extends Controller
             'content' => 'required|max:191'
         ]);
         
-        $task = Task::find($id);
-        $task->status = $request->status;
-        $task->content = $request->content;
-        $task->save();
+        $tasklist = tasklist::find($id);
+        $tasklist->status = $request->status;
+        $tasklist->content = $request->content;
+        $tasklist->save();
         
 
         return redirect('/');
@@ -115,9 +127,12 @@ class TasksController extends Controller
      */
     public function destroy($id)
     {
-        $task = Task::find($id);
-        $task->delete();
+       $tasklist = \App\tasklist::find($id);
 
-        return redirect('/');
+         if (\Auth::user()->id === $tasklist->user_id) {
+             $tasklist->delete();
+        }
+        return redirect()->back();
     }
+    
 }
